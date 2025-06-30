@@ -26,9 +26,9 @@ class JSONErrorBottle(Bottle):
 app = JSONErrorBottle()
 
 @app.route('<path:path>', method=['GET'])
-def controller_v1():
+def controller_v1(path):
     """
-    Controller v1
+    Controller v1S
     """
     req = V1RequestBase(request.json)
     res = flaresolverr_service.controller_v1_endpoint(req)
