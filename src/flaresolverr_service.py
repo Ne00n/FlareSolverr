@@ -118,7 +118,9 @@ def _controller_v1_handler(req: V1RequestBase) -> V1ResponseBase:
 
     # execute the command
     res: V1ResponseBase
-    if req.cmd == 'sessions.create':
+    if req.cmd is None:
+        res = _cmd_request_get(req)
+    elif req.cmd == 'sessions.create':
         res = _cmd_sessions_create(req)
     elif req.cmd == 'sessions.list':
         res = _cmd_sessions_list(req)
