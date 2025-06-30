@@ -33,6 +33,7 @@ def controller_v1(path):
     logging.debug(f"request.json type: {type(request.json)}, value: {request.json}")
     req = V1RequestBase(request.json or {})
     logging.debug(f"Constructed V1RequestBase: {req.__dict__}")
+    req.url = request.url.replace("http","https")
     res = flaresolverr_service.controller_v1_endpoint(req)
     if res.__error_500__:
         response.status = 500
