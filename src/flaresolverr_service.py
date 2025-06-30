@@ -287,18 +287,23 @@ def _evil_logic(req: V1RequestBase, driver: WebDriver, method: str) -> Challenge
     if method == 'POST':
         _post_request(req, driver)
     else:
+        logging.debug('Handling GET request')
         driver.get(req.url)
 
     # set cookies if required
-    if req.cookies is not None and len(req.cookies) > 0:
+    logging.debug(f"req.cookies type: {type(req.cookies)}, value: {req.cookies}")
+    if req.cookies:
         logging.debug(f'Setting cookies...')
         for cookie in req.cookies:
+            logging.debug(f"Setting cookie: {cookie}")
             driver.delete_cookie(cookie['name'])
             driver.add_cookie(cookie)
         # reload the page
         if method == 'POST':
+            logging.debug('Reloading page after setting cookies (POST)')
             _post_request(req, driver)
         else:
+            logging.debug('Reloading page after setting cookies (GET)')
             driver.get(req.url)
 
     # wait for the page
