@@ -25,27 +25,7 @@ class JSONErrorBottle(Bottle):
 
 app = JSONErrorBottle()
 
-
-@app.route('/')
-def index():
-    """
-    Show welcome message
-    """
-    res = flaresolverr_service.index_endpoint()
-    return utils.object_to_dict(res)
-
-
-@app.route('/health')
-def health():
-    """
-    Healthcheck endpoint.
-    This endpoint is special because it doesn't print traces
-    """
-    res = flaresolverr_service.health_endpoint()
-    return utils.object_to_dict(res)
-
-
-@app.post('/v1')
+@app.route('<path:path>', method=['GET'])
 def controller_v1():
     """
     Controller v1
