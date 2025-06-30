@@ -91,6 +91,7 @@ def health_endpoint() -> HealthResponse:
 
 
 def controller_v1_endpoint(req: V1RequestBase) -> V1ResponseBase:
+    logging.debug(f"controller_v1_endpoint received req type: {type(req)}, value: {getattr(req, '__dict__', str(req))}")
     start_ts = int(time.time() * 1000)
     logging.info(f"Incoming request => POST /v1 body: {utils.object_to_dict(req)}")
     res: V1ResponseBase
@@ -106,12 +107,14 @@ def controller_v1_endpoint(req: V1RequestBase) -> V1ResponseBase:
     res.startTimestamp = start_ts
     res.endTimestamp = int(time.time() * 1000)
     res.version = utils.get_flaresolverr_version()
+    logging.debug(f"controller_v1_endpoint returning res type: {type(res)}, value: {getattr(res, '__dict__', str(res))}")
     logging.debug(f"Response => POST /v1 body: {utils.object_to_dict(res)}")
     logging.info(f"Response in {(res.endTimestamp - res.startTimestamp) / 1000} s")
     return res
 
 
 def _controller_v1_handler(req: V1RequestBase) -> V1ResponseBase:
+    logging.debug(f"_controller_v1_handler received req type: {type(req)}, value: {req.__dict__}")
     # set default values
     if req.maxTimeout is None or int(req.maxTimeout) < 1:
         req.maxTimeout = 60000
@@ -133,6 +136,7 @@ def _controller_v1_handler(req: V1RequestBase) -> V1ResponseBase:
     else:
         raise Exception(f"Request parameter 'cmd' = '{req.cmd}' is invalid.")
 
+    logging.debug(f"_controller_v1_handler returning res type: {type(res)}, value: {res.__dict__}")
     return res
 
 

@@ -30,7 +30,9 @@ def controller_v1(path):
     """
     Controller v1S
     """
-    req = V1RequestBase(request.json)
+    logging.debug(f"request.json type: {type(request.json)}, value: {request.json}")
+    req = V1RequestBase(request.json or {})
+    logging.debug(f"Constructed V1RequestBase: {req.__dict__}")
     res = flaresolverr_service.controller_v1_endpoint(req)
     if res.__error_500__:
         response.status = 500
