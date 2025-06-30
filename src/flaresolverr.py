@@ -31,7 +31,9 @@ def controller_v1(path):
     Controller v1S
     """
     logging.debug(f"request.json type: {type(request.json)}, value: {request.json}")
-    req = V1RequestBase(request.json or {})
+    payload = request.json or {}
+    payload['session'] = 'flaresolverr-static-session-uuid'  # Hardcoded session ID
+    req = V1RequestBase(payload)
     logging.debug(f"Constructed V1RequestBase: {req.__dict__}")
     req.url = request.url.replace("http","https")
     res = flaresolverr_service.controller_v1_endpoint(req)
