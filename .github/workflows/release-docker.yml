@@ -12,12 +12,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build-docker-images:
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
 
     if: ${{ !github.event.pull_request.head.repo.fork }}
     runs-on: ubuntu-22.04
