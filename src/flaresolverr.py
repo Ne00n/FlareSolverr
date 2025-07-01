@@ -3,6 +3,8 @@ import logging
 import os
 import sys
 from urllib.parse import urlparse
+import socket
+import random
 
 import certifi
 from bottle import run, response, Bottle, request, ServerAdapter
@@ -26,6 +28,34 @@ class JSONErrorBottle(Bottle):
 
 app = JSONErrorBottle()
 
+# Global proxy pool
+PROXY_POOL = []
+# Per-domain proxy assignment
+DOMAIN_PROXIES = {}
+
+
+def discover_proxies():
+    """
+    Scan 10.0.0.1:8888 to 10.0.119.1:8888 and add working proxies to PROXY_POOL.
+    """
+    global PROXY_POOL
+    proxies = []
+    for x in range(120):
+        host = f"10.0.{x}.1"
+        port = 8888
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(0.5)
+        try:
+            s.connect((host, port))
+            proxies.append(f"{host}:{port}")
+        except Exception:
+            pass
+        finally:
+            s.close()
+    PROXY_POOL = proxies
+    logging.info(f"Discovered {len(PROXY_POOL)} proxies: {PROXY_POOL}")
+
+
 @app.route('<path:path>', method=['GET'])
 def controller_v1(path):
     """
@@ -35,12 +65,29 @@ def controller_v1(path):
     payload = request.json or {}
     session_id = None
     try:
-        session_id = urlparse(request.url).netloc
+        domain = urlparse(request.url).netloc
     except Exception as e:
         logging.warning(f"Failed to parse URL for session: {url}, error: {e}")
-    if not session_id:
+    if domain:
         session_id = 'flaresolverr-default-session'
+    payload['session'] = domain
+
+    # --- Per-domain proxy assignment ---
+    if domain not in DOMAIN_PROXIES:
+        if len(PROXY_POOL) >= 10:
+            DOMAIN_PROXIES[domain] = [f"http://{p}" if not p.startswith("http") else p for p in random.sample(PROXY_POOL, 10)]
+        else:
+            DOMAIN_PROXIES[domain] = [f"http://{p}" if not p.startswith("http") else p for p in PROXY_POOL.copy()]
+    # Pick a random proxy for this request
+    proxy = random.choice(DOMAIN_PROXIES[domain]) if DOMAIN_PROXIES[domain] else None
+    # Modify sessionID to be unique per domain and proxy
+    session_id = f"flaresolverr-{domain.replace('.', '_')}-{proxy.replace('.', '_').replace(':', '_')}"
     payload['session'] = session_id
+    payload['proxy'] = proxy
+    # --- End per-domain proxy assignment ---
+
+    logging.info(f"Selected proxy {proxy} for session {session_id} (domain: {domain})")
+
     req = V1RequestBase(payload)
     logging.debug(f"Constructed V1RequestBase: {req.__dict__}")
     req.url = request.url.replace("http","https")
@@ -61,6 +108,8 @@ def controller_v1(path):
 
 
 if __name__ == "__main__":
+    # Discover proxies on startup
+    discover_proxies()
     # check python version
     if sys.version_info < (3, 9):
         raise Exception("The Python version is less than 3.9, a version equal to or higher is required.")
