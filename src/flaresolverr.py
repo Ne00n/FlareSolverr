@@ -2,7 +2,6 @@ import json
 import logging
 import os
 import sys
-from urllib.parse import urlparse
 
 import certifi
 from bottle import run, response, Bottle, request, ServerAdapter
@@ -33,17 +32,7 @@ def controller_v1(path):
     """
     logging.debug(f"request.json type: {type(request.json)}, value: {request.json}")
     payload = request.json or {}
-    # Use the domain from the URL as the session ID
-    url = payload.get('url')
-    session_id = None
-    if url:
-        try:
-            session_id = urlparse(url).netloc
-        except Exception as e:
-            logging.warning(f"Failed to parse URL for session: {url}, error: {e}")
-    if not session_id:
-        session_id = 'flaresolverr-default-session'
-    payload['session'] = session_id
+    payload['session'] = 'flaresolverr-static-session-uuid'  # Hardcoded session ID
     req = V1RequestBase(payload)
     logging.debug(f"Constructed V1RequestBase: {req.__dict__}")
     req.url = request.url.replace("http","https")
