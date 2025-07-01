@@ -55,7 +55,9 @@ def controller_v1(path):
     # If solution and HTML response exist, return it as HTML
     if hasattr(res, 'solution') and res.solution and hasattr(res.solution, 'response') and res.solution.response:
         response.content_type = 'text/html'
-        return res.solution.response
+        #rewrite to http
+        html = res.solution.response.replace("https://","http://")
+        return html
     # Fallback: return JSON (should not happen in normal flow)
     response.content_type = 'application/json'
     return utils.object_to_dict(res)
