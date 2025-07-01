@@ -47,7 +47,7 @@ def discover_proxies():
         s.settimeout(0.5)
         try:
             s.connect((host, port))
-            proxies.append(f"{host}:{port}")
+            proxies.append(f"http://{host}:{port}")
         except Exception:
             pass
         finally:
@@ -63,7 +63,7 @@ def controller_v1(path):
     """
     logging.debug(f"request.json type: {type(request.json)}, value: {request.json}")
     payload = request.json or {}
-    session_id = None
+    session_id, domain = None, None
     try:
         domain = urlparse(request.url).netloc
     except Exception as e:
@@ -75,13 +75,13 @@ def controller_v1(path):
     # --- Per-domain proxy assignment ---
     if domain not in DOMAIN_PROXIES:
         if len(PROXY_POOL) >= 10:
-            DOMAIN_PROXIES[domain] = [f"http://{p}" if not p.startswith("http") else p for p in random.sample(PROXY_POOL, 10)]
+            DOMAIN_PROXIES[domain] = random.sample(PROXY_POOL, 10)
         else:
-            DOMAIN_PROXIES[domain] = [f"http://{p}" if not p.startswith("http") else p for p in PROXY_POOL.copy()]
+            DOMAIN_PROXIES[domain] = PROXY_POOL.copy()
     # Pick a random proxy for this request
     proxy = random.choice(DOMAIN_PROXIES[domain]) if DOMAIN_PROXIES[domain] else None
     # Modify sessionID to be unique per domain and proxy
-    session_id = f"flaresolverr-{domain.replace('.', '_')}-{proxy.replace('.', '_').replace(':', '_')}"
+    session_id = f"flaresolverr-{domain.replace('.', '_')}-{proxy.replace('.', '_').replace("http://","")}"
     payload['session'] = session_id
     payload['proxy'] = proxy
     # --- End per-domain proxy assignment ---
