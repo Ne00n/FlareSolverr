@@ -43,16 +43,19 @@ def discover_proxies():
     """
     global PROXY_POOL
     proxies = []
+    logging.debug("Starting proxy discovery loop...")
     for x in range(120):
         host = f"10.0.{x}.1"
         port = 8888
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.settimeout(0.5)
         try:
+            logging.debug(f"Trying proxy at {host}:{port}")
             s.connect((host, port))
             proxies.append(f"http://{host}:{port}")
-        except Exception:
-            pass
+            logging.info(f"Proxy found: http://{host}:{port}")
+        except Exception as e:
+            logging.debug(f"Proxy not found at {host}:{port}: {e}")
         finally:
             s.close()
     PROXY_POOL = proxies
@@ -76,13 +79,17 @@ def controller_v1(path):
     payload['session'] = domain
 
     # --- Per-domain proxy assignment ---
+    logging.debug(f"DOMAIN_PROXIES before assignment: {DOMAIN_PROXIES}")
     if domain not in DOMAIN_PROXIES:
         if len(PROXY_POOL) >= 10:
             DOMAIN_PROXIES[domain] = random.sample(PROXY_POOL, 10)
+            logging.debug(f"Assigned 10 random proxies to domain {domain}: {DOMAIN_PROXIES[domain]}")
         else:
             DOMAIN_PROXIES[domain] = PROXY_POOL.copy()
+            logging.debug(f"Assigned all proxies to domain {domain}: {DOMAIN_PROXIES[domain]}")
     # Pick a random proxy for this request
     proxy = random.choice(DOMAIN_PROXIES[domain]) if DOMAIN_PROXIES[domain] else None
+    logging.debug(f"Selected proxy for domain {domain}: {proxy}")
     # Modify sessionID to be unique per domain and proxy
     proxy_str = proxy.replace('.', '_').replace('http://','') if proxy else 'no_proxy'
     session_id = f"flaresolverr-{domain.replace('.', '_')}-{proxy_str}"
