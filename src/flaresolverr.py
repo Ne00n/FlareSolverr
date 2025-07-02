@@ -137,8 +137,6 @@ def controller_v1(path):
 
 
 if __name__ == "__main__":
-    # Discover proxies on startup
-    discover_proxies()
     # check python version
     if sys.version_info < (3, 9):
         raise Exception("The Python version is less than 3.9, a version equal to or higher is required.")
@@ -156,7 +154,7 @@ if __name__ == "__main__":
     os.environ["SSL_CERT_FILE"] = certifi.where()
 
     # validate configuration
-    log_level = os.environ.get('LOG_LEVEL', 'debug').upper()
+    log_level = os.environ.get('LOG_LEVEL', 'info').upper()
     log_html = utils.get_config_log_html()
     headless = utils.get_config_headless()
     server_host = os.environ.get('HOST', '0.0.0.0')
@@ -184,6 +182,9 @@ if __name__ == "__main__":
 
     # Get current OS for global variable
     utils.get_current_platform()
+
+    # Discover proxies after logger is configured
+    discover_proxies()
 
     # test browser installation
     flaresolverr_service.test_browser_installation()
