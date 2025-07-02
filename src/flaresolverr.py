@@ -5,6 +5,9 @@ import sys
 from urllib.parse import urlparse
 import socket
 import random
+import re
+from email.utils import format_datetime
+from datetime import datetime
 
 import certifi
 from bottle import run, response, Bottle, request, ServerAdapter
@@ -101,6 +104,24 @@ def controller_v1(path):
         response.content_type = 'text/html'
         #rewrite to http
         html = res.solution.response.replace("https://","http://")
+        # --- Remove ThankedByBox elements if present ---
+        html = re.sub(r'<div[^>]*class=["\"][^"\"]*ThankedByBox[^"\"]*["\"][^>]*>.*?</div>', '', html, flags=re.DOTALL)
+        # --- Remove Box BoxInThisDiscussion elements if present ---
+        html = re.sub(r'<div[^>]*class=["\"][^"\"]*Box BoxInThisDiscussion[^"\"]*["\"][^>]*>.*?</div>', '', html, flags=re.DOTALL)
+        # --- Extract <time title="..."> and set Last-Modified header ---
+        match = re.search(r'rel="nofollow"><time title="([^"]+)"', html)
+        if match:
+            date_str = match.group(1)
+            try:
+                # Try parsing the date string (e.g., 'February 17, 2025 1:20AM')
+                dt = datetime.strptime(date_str, '%B %d, %Y %I:%M%p')
+                # Format as RFC 1123 for Last-Modified
+                http_date = format_datetime(dt)
+                response.set_header('Last-Modified', http_date)
+                logging.info(f"Set Last-Modified header to: {http_date}")
+            except Exception as e:
+                logging.warning(f"Failed to parse date '{date_str}' for Last-Modified header: {e}")
+        # --- End Last-Modified logic ---
         return html
     # Fallback: return JSON (should not happen in normal flow)
     response.content_type = 'application/json'
