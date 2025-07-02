@@ -84,7 +84,8 @@ def controller_v1(path):
     # Pick a random proxy for this request
     proxy = random.choice(DOMAIN_PROXIES[domain]) if DOMAIN_PROXIES[domain] else None
     # Modify sessionID to be unique per domain and proxy
-    session_id = f"flaresolverr-{domain.replace('.', '_')}-{proxy.replace('.', '_').replace('http://','')}"
+    proxy_str = proxy.replace('.', '_').replace('http://','') if proxy else 'no_proxy'
+    session_id = f"flaresolverr-{domain.replace('.', '_')}-{proxy_str}"
     payload['session'] = session_id
     payload['proxy'] = proxy
     # --- End per-domain proxy assignment ---
