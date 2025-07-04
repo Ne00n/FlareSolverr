@@ -37,6 +37,8 @@ PROXY_POOL = []
 DOMAIN_PROXIES = {}
 # Number of proxies per domain (parameterized)
 PROXIES_PER_DOMAIN = int(os.environ.get('PROXIES_PER_DOMAIN', 10))
+# Parameter to skip proxy setup
+SKIP_PROXY_SETUP = os.environ.get('SKIP_PROXY_SETUP', 'false').lower() == 'true'
 
 
 def discover_proxies():
@@ -81,25 +83,30 @@ def controller_v1(path):
     payload['session'] = domain
 
     # --- Per-domain proxy assignment ---
-    logging.debug(f"DOMAIN_PROXIES before assignment: {DOMAIN_PROXIES}")
-    if domain not in DOMAIN_PROXIES:
-        if len(PROXY_POOL) >= PROXIES_PER_DOMAIN:
-            DOMAIN_PROXIES[domain] = random.sample(PROXY_POOL, PROXIES_PER_DOMAIN)
-            logging.debug(f"Assigned {PROXIES_PER_DOMAIN} random proxies to domain {domain}: {DOMAIN_PROXIES[domain]}")
-        else:
-            DOMAIN_PROXIES[domain] = PROXY_POOL.copy()
-            logging.debug(f"Assigned all proxies to domain {domain}: {DOMAIN_PROXIES[domain]}")
-    # Pick a random proxy for this request
-    proxy = random.choice(DOMAIN_PROXIES[domain]) if DOMAIN_PROXIES[domain] else None
-    logging.debug(f"Selected proxy for domain {domain}: {proxy}")
-    # Modify sessionID to be unique per domain and proxy
-    proxy_str = proxy.replace('.', '_').replace('http://','') if proxy else 'no_proxy'
-    session_id = f"flaresolverr-{domain.replace('.', '_')}-{proxy_str}"
-    payload['session'] = session_id
-    payload['proxy'] = proxy
+    if not SKIP_PROXY_SETUP:
+        logging.debug(f"DOMAIN_PROXIES before assignment: {DOMAIN_PROXIES}")
+        if domain not in DOMAIN_PROXIES:
+            if len(PROXY_POOL) >= PROXIES_PER_DOMAIN:
+                DOMAIN_PROXIES[domain] = random.sample(PROXY_POOL, PROXIES_PER_DOMAIN)
+                logging.debug(f"Assigned {PROXIES_PER_DOMAIN} random proxies to domain {domain}: {DOMAIN_PROXIES[domain]}")
+            else:
+                DOMAIN_PROXIES[domain] = PROXY_POOL.copy()
+                logging.debug(f"Assigned all proxies to domain {domain}: {DOMAIN_PROXIES[domain]}")
+        # Pick a random proxy for this request
+        proxy = random.choice(DOMAIN_PROXIES[domain]) if DOMAIN_PROXIES[domain] else None
+        logging.debug(f"Selected proxy for domain {domain}: {proxy}")
+        # Modify sessionID to be unique per domain and proxy
+        proxy_str = proxy.replace('.', '_').replace('http://','') if proxy else 'no_proxy'
+        session_id = f"flaresolverr-{domain.replace('.', '_')}-{proxy_str}"
+        payload['session'] = session_id
+        payload['proxy'] = proxy
+        logging.info(f"Selected proxy {proxy} for session {session_id} (domain: {domain})")
+    else:
+        # If skipping proxy setup, use default session and no proxy
+        session_id = f"flaresolverr-{domain.replace('.', '_')}-no_proxy"
+        payload['session'] = session_id
+        logging.info(f"Proxy setup skipped for domain {domain}, using session {session_id}")
     # --- End per-domain proxy assignment ---
-
-    logging.info(f"Selected proxy {proxy} for session {session_id} (domain: {domain})")
 
     req = V1RequestBase(payload)
     logging.debug(f"Constructed V1RequestBase: {req.__dict__}")
@@ -185,8 +192,11 @@ if __name__ == "__main__":
     # Get current OS for global variable
     utils.get_current_platform()
 
-    # Discover proxies after logger is configured
-    discover_proxies()
+    # Discover proxies after logger is configured, unless skipping proxy setup
+    if not SKIP_PROXY_SETUP:
+        discover_proxies()
+    else:
+        logging.info("Skipping proxy setup as per SKIP_PROXY_SETUP parameter.")
 
     # test browser installation
     flaresolverr_service.test_browser_installation()
