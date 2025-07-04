@@ -35,6 +35,8 @@ app = JSONErrorBottle()
 PROXY_POOL = []
 # Per-domain proxy assignment
 DOMAIN_PROXIES = {}
+# Number of proxies per domain (parameterized)
+PROXIES_PER_DOMAIN = int(os.environ.get('PROXIES_PER_DOMAIN', 10))
 
 
 def discover_proxies():
@@ -81,9 +83,9 @@ def controller_v1(path):
     # --- Per-domain proxy assignment ---
     logging.debug(f"DOMAIN_PROXIES before assignment: {DOMAIN_PROXIES}")
     if domain not in DOMAIN_PROXIES:
-        if len(PROXY_POOL) >= 10:
-            DOMAIN_PROXIES[domain] = random.sample(PROXY_POOL, 10)
-            logging.debug(f"Assigned 10 random proxies to domain {domain}: {DOMAIN_PROXIES[domain]}")
+        if len(PROXY_POOL) >= PROXIES_PER_DOMAIN:
+            DOMAIN_PROXIES[domain] = random.sample(PROXY_POOL, PROXIES_PER_DOMAIN)
+            logging.debug(f"Assigned {PROXIES_PER_DOMAIN} random proxies to domain {domain}: {DOMAIN_PROXIES[domain]}")
         else:
             DOMAIN_PROXIES[domain] = PROXY_POOL.copy()
             logging.debug(f"Assigned all proxies to domain {domain}: {DOMAIN_PROXIES[domain]}")
