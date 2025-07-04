@@ -222,33 +222,54 @@ def _cmd_sessions_destroy(req: V1RequestBase) -> V1ResponseBase:
 def _resolve_challenge(req: V1RequestBase, method: str) -> ChallengeResolutionT:
     timeout = int(req.maxTimeout) / 1000
     driver = None
-    try:
-        if req.session:
-            session_id = req.session
-            ttl = timedelta(minutes=req.session_ttl_minutes) if req.session_ttl_minutes else None
-            session, fresh = SESSIONS_STORAGE.get(session_id, ttl)
-
-            if fresh:
-                logging.debug(f"new session created to perform the request (session_id={session_id})")
+    session_id = None
+    session_proxy = None
+    is_session = bool(req.session)
+    retry_attempted = False
+    while True:
+        try:
+            if is_session:
+                session_id = req.session
+                ttl = timedelta(minutes=req.session_ttl_minutes) if req.session_ttl_minutes else None
+                session, fresh = SESSIONS_STORAGE.get(session_id, ttl)
+                session_proxy = session.proxy if hasattr(session, 'proxy') else None
+                if fresh:
+                    logging.debug(f"new session created to perform the request (session_id={session_id})")
+                else:
+                    logging.debug(f"existing session is used to perform the request (session_id={session_id}, "
+                                  f"lifetime={str(session.lifetime())}, ttl={str(ttl)})")
+                driver = session.driver
             else:
-                logging.debug(f"existing session is used to perform the request (session_id={session_id}, "
-                              f"lifetime={str(session.lifetime())}, ttl={str(ttl)})")
-
-            driver = session.driver
-        else:
-            driver = utils.get_webdriver(req.proxy)
-            logging.debug('New instance of webdriver has been created to perform the request')
-        return func_timeout(timeout, _evil_logic, (req, driver, method))
-    except FunctionTimedOut:
-        raise Exception(f'Error solving the challenge. Timeout after {timeout} seconds.')
-    except Exception as e:
-        raise Exception('Error solving the challenge. ' + str(e).replace('\n', '\\n'))
-    finally:
-        if not req.session and driver is not None:
-            if utils.PLATFORM_VERSION == "nt":
-                driver.close()
-            driver.quit()
-            logging.debug('A used instance of webdriver has been destroyed')
+                driver = utils.get_webdriver(req.proxy)
+                logging.debug('New instance of webdriver has been created to perform the request')
+            return func_timeout(timeout, _evil_logic, (req, driver, method))
+        except FunctionTimedOut:
+            raise Exception(f'Error solving the challenge. Timeout after {timeout} seconds.')
+        except Exception as e:
+            error_msg = str(e)
+            # Only retry for session requests, and only once, if tab crashed
+            if is_session and (not retry_attempted) and ("tab crashed" in error_msg or "chrome not reachable" in error_msg or "disconnected: not connected to DevTools" in error_msg):
+                logging.warning(f"Session tab crashed, will destroy and recreate session {session_id} and retry once.")
+                try:
+                    SESSIONS_STORAGE.destroy(session_id)
+                except Exception as destroy_exc:
+                    logging.warning(f"Failed to destroy crashed session {session_id}: {destroy_exc}")
+                # Recreate session with same ID and proxy
+                try:
+                    SESSIONS_STORAGE.create(session_id=session_id, proxy=session_proxy or req.proxy)
+                except Exception as create_exc:
+                    logging.error(f"Failed to recreate session {session_id}: {create_exc}")
+                    raise Exception('Error solving the challenge. ' + error_msg.replace('\n', '\\n'))
+                retry_attempted = True
+                continue  # retry
+            else:
+                raise Exception('Error solving the challenge. ' + error_msg.replace('\n', '\\n'))
+        finally:
+            if not is_session and driver is not None:
+                if utils.PLATFORM_VERSION == "nt":
+                    driver.close()
+                driver.quit()
+                logging.debug('A used instance of webdriver has been destroyed')
 
 
 def click_verify(driver: WebDriver):
