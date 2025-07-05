@@ -248,18 +248,23 @@ def _resolve_challenge(req: V1RequestBase, method: str) -> ChallengeResolutionT:
         except Exception as e:
             error_msg = str(e)
             # Only retry for session requests, and only once, if tab crashed
-            if is_session and (not retry_attempted) and ("tab crashed" in error_msg or "chrome not reachable" in error_msg or "disconnected: not connected to DevTools" in error_msg):
-                logging.warning(f"Session tab crashed, will destroy and recreate session {session_id} and retry once.")
+            if is_session and (not retry_attempted) and ("tab crashed" in error_msg or "chrome not reachable" in error_msg or "disconnected: not connected to DevTools" in error_msg or "invalid session id" in error_msg):
+                logging.warning(f"Session tab crashed or invalid, will destroy and recreate session {session_id} and retry once.")
                 try:
                     SESSIONS_STORAGE.destroy(session_id)
+                    logging.info(f"Destroyed session {session_id} after crash/invalid session.")
                 except Exception as destroy_exc:
                     logging.warning(f"Failed to destroy crashed session {session_id}: {destroy_exc}")
                 # Recreate session with same ID and proxy
                 try:
                     SESSIONS_STORAGE.create(session_id=session_id, proxy=session_proxy or req.proxy)
+                    logging.info(f"Recreated session {session_id} with proxy {session_proxy or req.proxy}.")
                 except Exception as create_exc:
                     logging.error(f"Failed to recreate session {session_id}: {create_exc}")
                     raise Exception('Error solving the challenge. ' + error_msg.replace('\n', '\\n'))
+                import time as _time
+                _time.sleep(1)  # Short delay to allow browser to restart
+                logging.info(f"Retrying challenge resolution for session {session_id} after recovery.")
                 retry_attempted = True
                 continue  # retry
             else:
